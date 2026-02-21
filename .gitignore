@@ -1,0 +1,70 @@
+# dependencies
+node_modules
+/.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# pnpm
+.pnpm-store
+pnpm-lock.yaml
+
+# testing
+/coverage
+
+# next.js
+.next/
+out/
+.next
+
+# turbo
+.turbo
+
+# production
+build
+dist
+dist-ssr
+!apps/claude-agent/dist
+
+# misc
+.DS_Store
+*.pem
+*.key
+*.p12
+*.pfx
+*.cert
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+logs
+*.log
+
+# local env files
+.env*
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# IDE
+.idea
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Temporary files
+.vite-react-ssg-temp/
+
+
+.claude/plan.md

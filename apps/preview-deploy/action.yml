@@ -1,0 +1,90 @@
+name: 'Preview Deploy'
+description: 'Deploy preview to Vercel and notify Slack'
+
+inputs:
+  provider:
+    description: 'Deploy provider (vercel)'
+    required: false
+    default: 'vercel'
+  vercel_token:
+    description: 'Vercel token'
+    required: true
+  vercel_org_id:
+    description: 'Vercel org ID'
+    required: true
+  vercel_project_id:
+    description: 'Vercel project ID'
+    required: true
+  slack_bot_token:
+    description: 'Slack bot token for notifications'
+    required: false
+
+outputs:
+  url:
+    description: 'Preview deployment URL'
+    value: ${{ steps.deploy.outputs.url }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Deploy to Vercel
+      if: inputs.provider == 'vercel'
+      id: deploy
+      shell: bash
+      run: |
+        npm install -g vercel@latest
+        url=$(vercel deploy \
+          --token=${{ inputs.vercel_token }} \
+          --meta githubCommitRef=${{ github.head_ref }} \
+          --meta githubCommitSha=${{ github.event.pull_request.head.sha }} \
+          --meta githubCommitMessage="${{ github.event.pull_request.title }}" \
+          --meta githubCommitAuthorName="${{ github.event.pull_request.user.login }}" \
+          --meta githubPrId=${{ github.event.pull_request.number }})
+        echo "url=$url" >> $GITHUB_OUTPUT
+      env:
+        VERCEL_ORG_ID: ${{ inputs.vercel_org_id }}
+        VERCEL_PROJECT_ID: ${{ inputs.vercel_project_id }}
+
+    - name: Comment PR with preview URL
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const url = '${{ steps.deploy.outputs.url }}';
+          const branch = '${{ github.head_ref }}';
+          const commit = '${{ github.event.pull_request.head.sha }}'.substring(0, 7);
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `Preview deployed: ${url}\n\n**Branch:** \`${branch}\`\n**Commit:** \`${commit}\``
+          });
+
+    - name: Extract Slack info from PR body
+      id: slack-info
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const body = context.payload.pull_request.body || '';
+          const channelMatch = body.match(/<!-- slack_channel:(.+?) -->/);
+          const threadMatch = body.match(/<!-- slack_thread:(.+?) -->/);
+          core.setOutput('channel', channelMatch ? channelMatch[1] : '');
+          core.setOutput('thread_ts', threadMatch ? threadMatch[1] : '');
+
+    - name: Notify Slack
+      if: steps.slack-info.outputs.channel != '' && inputs.slack_bot_token != ''
+      uses: slackapi/slack-github-action@v2
+      with:
+        method: chat.postMessage
+        token: ${{ inputs.slack_bot_token }}
+        payload: |
+          channel: ${{ steps.slack-info.outputs.channel }}
+          thread_ts: ${{ steps.slack-info.outputs.thread_ts }}
+          text: "Preview 준비됐습니다!"
+          blocks:
+            - type: section
+              text:
+                type: mrkdwn
+                text: |
+                  *Preview 준비됐습니다!*
+                  <${{ steps.deploy.outputs.url }}|여기서 확인해주세요!>
+                  <${{ github.event.pull_request.html_url }}|PR #${{ github.event.pull_request.number }}>

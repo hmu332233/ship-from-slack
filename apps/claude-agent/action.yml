@@ -1,0 +1,75 @@
+name: 'Claude Code Agent'
+description: 'Claude AI agent that plans, executes code changes, and creates PRs'
+
+inputs:
+  client_payload:
+    description: 'JSON string of the client payload from repository_dispatch'
+    required: true
+  anthropic_api_key:
+    description: 'Anthropic API key'
+    required: true
+  slack_bot_token:
+    description: 'Slack bot token for notifications'
+    required: true
+  pat_token:
+    description: 'GitHub PAT for cross-repo git push and PR operations'
+    required: true
+
+outputs:
+  plan_cost:
+    description: 'Plan phase cost in USD'
+    value: ${{ steps.claude.outputs.plan_cost }}
+  execute_cost:
+    description: 'Execute phase cost in USD'
+    value: ${{ steps.claude.outputs.execute_cost }}
+  total_cost:
+    description: 'Total cost in USD'
+    value: ${{ steps.claude.outputs.total_cost }}
+  plan_turns:
+    description: 'Number of turns in plan phase'
+    value: ${{ steps.claude.outputs.plan_turns }}
+  execute_turns:
+    description: 'Number of turns in execute phase'
+    value: ${{ steps.claude.outputs.execute_turns }}
+  plan_input_tokens:
+    description: 'Input tokens used in plan phase'
+    value: ${{ steps.claude.outputs.plan_input_tokens }}
+  plan_output_tokens:
+    description: 'Output tokens used in plan phase'
+    value: ${{ steps.claude.outputs.plan_output_tokens }}
+  execute_input_tokens:
+    description: 'Input tokens used in execute phase'
+    value: ${{ steps.claude.outputs.execute_input_tokens }}
+  execute_output_tokens:
+    description: 'Output tokens used in execute phase'
+    value: ${{ steps.claude.outputs.execute_output_tokens }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 8
+
+    - name: Exclude plan file from git tracking
+      shell: bash
+      run: echo '.claude/plan.md' >> .git/info/exclude
+
+    - name: Install claude-agent dependencies
+      shell: bash
+      run: pnpm install --prod
+      working-directory: ${{ github.action_path }}
+
+    - name: Run Claude Agent
+      id: claude
+      shell: bash
+      run: node ${{ github.action_path }}/dist/index.js
+      env:
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
+        CLIENT_PAYLOAD: ${{ inputs.client_payload }}
+        SLACK_BOT_TOKEN: ${{ inputs.slack_bot_token }}
+        GITHUB_TOKEN: ${{ github.token }}
+        PAT_TOKEN: ${{ inputs.pat_token }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_RUN_ID: ${{ github.run_id }}

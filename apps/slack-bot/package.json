@@ -1,0 +1,9 @@
+{
+  "name": "slack-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "vercel": "^50.4.10"
+  }
+}
