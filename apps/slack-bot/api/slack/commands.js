@@ -8,9 +8,9 @@ export const config = {
 /**
  * 모달 JSON 생성
  *
- * v1과의 차이:
+ * 대화형 요청 모드:
  * - 대화형 모드 안내 문구 포함
- * - 체크박스 없음 (v2 앱 자체가 대화형이므로)
+ * - 체크박스 없이 추가 질문 흐름을 기본 제공
  */
 function createModal(triggerId) {
   return {

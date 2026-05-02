@@ -27,7 +27,7 @@ name: Claude Code Request
 
 on:
   repository_dispatch:
-    types: [claude-code-request-v3]
+    types: [claude-code-request]
 
 permissions:
   contents: write
@@ -57,7 +57,7 @@ jobs:
 
       - name: Run Claude Agent
         id: claude
-        uses: hmu332233/study.slack-claude-bot/apps/claude-agent@main
+        uses: hmu332233/ship-from-slack/apps/claude-agent@main
         with:
           client_payload: ${{ toJSON(github.event.client_payload) }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -108,7 +108,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Deploy Preview
-        uses: hmu332233/study.slack-claude-bot/apps/preview-deploy@main
+        uses: hmu332233/ship-from-slack/apps/preview-deploy@main
         with:
           provider: 'vercel'
           vercel_token: ${{ secrets.VERCEL_TOKEN }}
@@ -193,6 +193,7 @@ your-repo/
 | `read:org` | 라벨 추가 시 필요 (없으면 `deploy-preview` 라벨이 안 붙음) |
 
 > **참고:** Composite Action은 `secrets: inherit`가 아닌, workflow에서 직접 `${{ secrets.XXX }}`로 전달합니다. Step 1, 2의 예시를 참고하세요.
+> **참고:** 이 저장소를 fork해서 운영한다면 `uses: hmu332233/ship-from-slack/...@main`의 소유자/레포명을 fork한 저장소로 바꾸세요.
 
 ### Preview Workflow용 (선택)
 
@@ -265,9 +266,9 @@ your-repo/
 
 ### repository_dispatch가 트리거되지 않음
 
-**원인**: Slack Bot의 `GITHUB_REPO` 환경변수가 타겟 레포를 가리키지 않음
+**원인**: Slack Bot의 `GITHUB_REPO` 환경변수가 타겟 레포를 가리키지 않거나, 타겟 레포의 workflow가 `claude-code-request` 이벤트를 수신하지 않음
 
-**해결**: Slack Bot (Vercel) 환경변수에서 `GITHUB_REPO`를 타겟 레포 (`owner/repo`)로 변경
+**해결**: Slack Bot (Vercel) 환경변수에서 `GITHUB_REPO`를 타겟 레포 (`owner/repo`)로 변경하고, `.github/workflows/claude-code.yml`의 `repository_dispatch.types`에 `claude-code-request`가 있는지 확인
 
 ### PR에 deploy-preview 라벨이 안 붙음
 

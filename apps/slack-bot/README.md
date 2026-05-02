@@ -1,6 +1,6 @@
-# Slack Bot V2 - 대화형 워크플로우
+# Slack Bot - 대화형 워크플로우
 
-이 문서는  **대화형 Slack Bot V2**를 설정하고 배포하는 방법을 안내합니다.
+이 문서는 **대화형 Slack Bot**을 설정하고 배포하는 방법을 안내합니다.
 
 ## 개요
 
@@ -9,7 +9,7 @@
 1. **질문 기능**: 애매한 요청 시 봇이 먼저 질문
 2. **추가 요청**: PR 완료 후 쓰레드에서 추가 작업 요청 가능
 3. **대화 연속성**: 사용자 답변을 기억하고 컨텍스트 유지
-4. **안전한 분리**: V1 코드 완전 무터치 (완전 독립 앱)
+4. **안전한 분리**: Slack 요청 처리와 Agent 실행을 독립 앱으로 분리
 
 ---
 
@@ -62,18 +62,19 @@ Vercel 프로젝트 **Settings → Environment Variables**:
 
 | 변수 | 값 | 설명 |
 |------|-----|------|
-| `SLACK_BOT_TOKEN` | xoxb-... | V2 앱의 Bot User OAuth Token |
-| `SLACK_SIGNING_SECRET` | ... | V2 앱의 Signing Secret |
+| `SLACK_BOT_TOKEN` | xoxb-... | Slack 앱의 Bot User OAuth Token |
+| `SLACK_SIGNING_SECRET` | ... | Slack 앱의 Signing Secret |
 | `GITHUB_TOKEN` | ghp-... | GitHub Personal Access Token |
 | `GITHUB_REPO` | owner/repo | 예: `hmu332233/ship-from-slack` |
 
-**중요**: `SLACK_BOT_TOKEN`은 V2 앱의 토큰입니다 (V1과 다름).
+**중요**: Bot은 `claude-code-request` repository_dispatch를 전송하므로, 타겟 레포의 `claude-code.yml`은 이 이벤트 타입을 수신해야 합니다.
 
 ### 2-3. 배포
 
 ```bash
 cd apps/slack-bot
-vercel --prod
+pnpm install
+pnpm exec vercel --prod
 ```
 
 배포 완료 후 URL을 기록합니다: `https://slack-bot-xxxx.vercel.app`
@@ -91,7 +92,7 @@ Vercel URL이 생성되면 Slack 앱 설정을 마저 진행합니다.
 | 항목 | 값 |
 |------|-----|
 | **Command** | `/request` |
-| **Request URL** | `https://<v2-vercel-url>/api/slack/commands` |
+| **Request URL** | `https://<vercel-url>/api/slack/commands` |
 | **Short Description** | 코드 수정 요청 (대화형) |
 | **Usage Hint** | 수정 요청 내용을 입력하세요 |
 
@@ -100,7 +101,7 @@ Vercel URL이 생성되면 Slack 앱 설정을 마저 진행합니다.
 **Interactivity & Shortcuts** 메뉴:
 
 1. **Interactivity** 토글 **ON**
-2. **Request URL**: `https://<v2-vercel-url>/api/slack/interactions`
+2. **Request URL**: `https://<vercel-url>/api/slack/interactions`
 3. **Save Changes**
 
 ### 3-3. Event Subscriptions
@@ -108,7 +109,7 @@ Vercel URL이 생성되면 Slack 앱 설정을 마저 진행합니다.
 **Event Subscriptions** 메뉴:
 
 1. **Enable Events** 토글 **ON**
-2. **Request URL**: `https://<v2-vercel-url>/api/slack/events`
+2. **Request URL**: `https://<vercel-url>/api/slack/events`
    - URL verification이 자동으로 진행됩니다 (초록 체크 표시 확인)
 3. **Subscribe to bot events** 섹션:
    - `app_mention` 추가
@@ -134,11 +135,11 @@ GitHub 레포지토리 **Settings → Secrets and variables → Actions**:
 
 | 변수 | 값 | 설명 |
 |------|-----|------|
-| `SLACK_BOT_TOKEN_V2` | xoxb-... | V2 앱의 Bot Token |
+| `SLACK_BOT_TOKEN` | xoxb-... | Slack 앱의 Bot Token |
 
 ### 기존 Secrets (재사용)
 
-다음은 V1과 동일한 값을 사용합니다:
+다음 값은 타겟 레포의 GitHub Actions에서 사용합니다:
 
 - `ANTHROPIC_API_KEY`
 - `VERCEL_TOKEN`
@@ -240,11 +241,10 @@ apps/slack-bot/
 │   ├── slack.js         # Slack API 유틸리티
 │   └── github.js        # GitHub API 유틸리티
 ├── package.json
-├── vercel.json
 └── .env.example
 
 .github/workflows/
-└── claude-code-request-v2.yml  # V2 워크플로우
+└── claude-code.yml  # repository_dispatch 수신 워크플로우
 ```
 
 ### 워크플로우
@@ -254,7 +254,7 @@ apps/slack-bot/
   ↓
 모달 입력
   ↓
-interactions.js → GitHub dispatch (claude-code-request-v2)
+interactions.js → GitHub dispatch (claude-code-request)
   ↓
 ┌─────────────────────────────────────┐
 │ Plan + Clarify (Opus)               │
@@ -312,7 +312,7 @@ questions.json 있음?
 1. Vercel Function 로그 확인 (`interactions.js`)
 2. GitHub Actions 트리거 확인:
    ```bash
-   gh api repos/owner/repo/actions/workflows/claude-code-request-v2.yml/runs
+   gh api repos/owner/repo/actions/workflows/claude-code.yml/runs
    ```
 3. `GITHUB_TOKEN` 권한 확인 (repo 스코프 필요)
 
@@ -364,9 +364,10 @@ cd apps/slack-bot
 
 # .env 파일 생성 (.env.example 참고)
 cp .env.example .env
+pnpm install
 
 # Vercel CLI로 로컬 테스트
-vercel dev
+pnpm exec vercel dev
 ```
 
 ### ngrok으로 Slack 연동 테스트
@@ -385,4 +386,4 @@ ngrok http 3000
 
 - [Slack API 문서](https://api.slack.com/)
 - [Vercel Serverless Functions](https://vercel.com/docs/functions/serverless-functions)
-- [명세서 전체](../../docs/INTERACTIVE-WORKFLOW-SPEC.md)
+- [요청 흐름 상태 관리](../../docs/request-flow-states.md)

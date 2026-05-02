@@ -39,7 +39,7 @@
 **핵심 설계 원칙**:
 - **Stateless Architecture**: GitHub Actions는 상태를 저장하지 않음
 - **Slack-as-State-Store**: 모든 상태는 Slack 스레드 메시지에서 복원
-- **Base64 Payload Encoding**: 전체 컨텍스트를 Slack 메타데이터에 직렬화하여 보존
+- **Slack Metadata Payload**: 전체 컨텍스트를 Slack 메타데이터 필드에 직렬화하여 보존
 - **Reverse Scanning**: 최신 메시지부터 역순 스캔으로 현재 상태 판별
 
 ---
@@ -62,7 +62,7 @@
 | 상태 | 의미 | 감지 방법 | 반환 구조 |
 |---|---|---|---|
 | `pr_ready` | PR 생성 완료, 추가 요청 가능 | `metadata.event_type === "pr_ready"` | `{ type: 'pr_ready', pr_number, branch }` |
-| `pending_question` | 질문 대기 중, 답변 필요 | `metadata.event_type === "pending_question"` | `{ type: 'pending_question', original_payload }` |
+| `pending_question` | 질문 대기 중, 답변 필요 | `metadata.event_type === "pending_question"` | `{ type: 'pending_question', payload }` |
 | `in_progress` | 작업 진행 중, 멘션 불가 | `metadata.event_type === "question_answered"` 또는 메타데이터 없음 | `{ type: 'in_progress' }` |
 
 **역순 스캔 이유** (L133-139의 주석):
@@ -118,8 +118,8 @@
 │   event_type:            │         │                          │
 │   "pending_question",    │         └──────────┬───────────────┘
 │   event_payload: {       │                    │
-│     original_payload:    │                    ▼
-│     base64(전체 payload) │         ┌──────────────────────────┐
+│     prompt, questions,   │                    ▼
+│     branch, pr_number    │         ┌──────────────────────────┐
 │   }                      │         │ [pr_ready]               │
 │ }                        │         │                          │
 └──────────┬───────────────┘         │ Slack metadata:          │
@@ -128,8 +128,8 @@
            │ events.js:88-158        │   event_payload: {       │
            ▼                         │     pr_number, branch    │
 ┌──────────────────────────┐         │   }                      │
-│ original_payload 복원     │         │ }                        │
-│ base64 디코딩            │         └──────────┬───────────────┘
+│ metadata payload 복원     │         │ }                        │
+│ JSON 필드 파싱            │         └──────────┬───────────────┘
 │                          │                    │
 │ clarification_history에  │                    │ 사용자 추가 요청 (@봇 멘션)
 │ Q&A 추가                 │                    │ events.js:161-198
@@ -190,34 +190,35 @@ type ClarificationEntry = {
 
 **문제**: GitHub Actions는 stateless이므로, 사용자가 답변할 때 원본 요청을 어떻게 기억하나?
 
-**해결책**: Base64 인코딩으로 Slack 메시지 메타데이터에 전체 payload 저장
+**해결책**: Slack 메시지 메타데이터에 payload 필드를 직접 저장
 
 1. **질문 전송 시** (`slack.ts:14-24`):
    ```typescript
-   const payloadJson = JSON.stringify({
-     prompt: payload.prompt,                                       // 원본 요청
-     clarification_history: payload.clarification_history || [],   // 기존 히스토리
-     questions: questions,                                         // 현재 질문
-     is_followup: payload.is_followup || false,
-     branch: payload.branch || "",
-     pr_number: payload.pr_number || "",
-   });
-   const originalPayloadB64 = Buffer.from(payloadJson).toString("base64");
-   
    // Slack 메시지 metadata에 저장
    metadata: {
      event_type: "pending_question",
      event_payload: {
-       original_payload: originalPayloadB64,
+       prompt: payload.prompt,
+       clarification_history: JSON.stringify(payload.clarification_history || []),
+       questions: JSON.stringify(questions),
+       is_followup: String(payload.is_followup || false),
+       branch: payload.branch || "",
+       pr_number: payload.pr_number || "",
      },
    }
    ```
 
 2. **답변 처리 시** (`events.js:102-105`):
    ```javascript
-   const originalPayload = JSON.parse(
-     Buffer.from(metadata.original_payload, 'base64').toString('utf-8')
-   );
+   const rawPayload = metadata.payload;
+   const originalPayload = {
+     prompt: rawPayload.prompt,
+     clarification_history: JSON.parse(rawPayload.clarification_history || '[]'),
+     questions: JSON.parse(rawPayload.questions || '[]'),
+     is_followup: rawPayload.is_followup === 'true',
+     branch: rawPayload.branch,
+     pr_number: rawPayload.pr_number,
+   };
    ```
 
 3. **새 payload 구성** (`events.js:143-154`):
@@ -437,7 +438,7 @@ for (let i = messages.length - 1; i >= 0; i--) {
        → in_progress 반환
 
     3. event_type === "pending_question"
-       → pending_question + original_payload 반환
+       → pending_question + payload 반환
   }
   // metadata가 없으면 아무것도 하지 않고 다음 메시지(i--)로 진행
 }
@@ -474,22 +475,27 @@ for (let i = messages.length - 1; i >= 0; i--) {
 
 **직렬화** (`slack.ts:14-24`):
 ```typescript
-const payloadJson = JSON.stringify({
+event_payload: {
   prompt: payload.prompt,
-  clarification_history: payload.clarification_history || [],
-  questions: questions,
-  is_followup: payload.is_followup || false,
+  clarification_history: JSON.stringify(payload.clarification_history || []),
+  questions: JSON.stringify(questions),
+  is_followup: String(payload.is_followup || false),
   branch: payload.branch || "",
   pr_number: payload.pr_number || "",
-});
-const originalPayloadB64 = Buffer.from(payloadJson).toString("base64");
+}
 ```
 
 **역직렬화** (`events.js:102-105`):
 ```javascript
-const originalPayload = JSON.parse(
-  Buffer.from(metadata.original_payload, 'base64').toString('utf-8')
-);
+const rawPayload = metadata.payload;
+const originalPayload = {
+  prompt: rawPayload.prompt,
+  clarification_history: JSON.parse(rawPayload.clarification_history || '[]'),
+  questions: JSON.parse(rawPayload.questions || '[]'),
+  is_followup: rawPayload.is_followup === 'true',
+  branch: rawPayload.branch,
+  pr_number: rawPayload.pr_number,
+};
 ```
 
 **보존되는 정보**:
@@ -518,7 +524,12 @@ const originalPayload = JSON.parse(
   metadata: {
     event_type: "pending_question",
     event_payload: {
-      original_payload: "base64..."
+      prompt: "...",
+      clarification_history: "[]",
+      questions: "[\"...\"]",
+      is_followup: "false",
+      branch: "",
+      pr_number: ""
     }
   }
 }
@@ -567,11 +578,11 @@ const originalPayload = JSON.parse(
    → Claude: needs_clarification=true, questions=["어떤 날짜를 변경할까요?", "언제로 변경할까요?"]
 
 3. Slack 메시지 전송 (pending_question)
-   → metadata.event_payload.original_payload = base64({ prompt: "날짜를 변경해주세요", questions: [...] })
+   → metadata.event_payload = { prompt: "날짜를 변경해주세요", questions: "[...]", ... }
 
 4. 사용자: @봇 "startDate를 2024-03-01로 변경"
    → findMetadataInThread() → pending_question
-   → original_payload 디코딩
+   → metadata.event_payload 복원
    → payload = { prompt: "날짜를 변경해주세요", clarification_history: [{questions: [...], answer: "startDate를 2024-03-01로"}] }
 
 5. Plan 재실행 (clarificationCount=1, clarification_history.length 기준)
@@ -616,16 +627,16 @@ const originalPayload = JSON.parse(
    → Claude: needs_clarification=true, questions=["어떤 에러 메시지를 수정할까요?"]
 
 3. Slack 메시지 (pending_question)
-   → metadata.event_payload.original_payload = base64({
+   → metadata.event_payload = {
        prompt: "에러 메시지를 수정해주세요",
-       questions: [...],
-       is_followup: true,    // followup 상태 보존!
+       questions: "[...]",
+       is_followup: "true",  // followup 상태 보존!
        branch: "...",
        pr_number: "123"
-     })
+     }
 
 4. 사용자: @봇 "로그인 실패 시 나오는 에러"
-   → original_payload 복원
+   → metadata.event_payload 복원
    → payload = {
        prompt: "에러 메시지를 수정해주세요",  // 원본 유지
        clarification_history: [{...}],
@@ -663,13 +674,13 @@ const originalPayload = JSON.parse(
 | `claude-agent/index.ts` | 메인 오케스트레이터 | L23-27 (clarification 분기) |
 | `claude-agent/prompts/plan-prompt.ts` | 프롬프트 빌더 | `buildPlanSystemPrompt()` (L9-39), 4가지 변형 |
 | `claude-agent/phases/plan.ts` | Plan 실행 | L7-10 (프롬프트 빌드), structured output 파싱 |
-| `claude-agent/services/slack.ts` | Slack 알림 | `sendClarificationToSlack()` (L7-51), base64 인코딩 |
+| `claude-agent/services/slack.ts` | Slack 알림 | `sendClarificationToSlack()` (L7-51), metadata payload 저장 |
 
 ### GitHub Actions
 
 | 파일 | 역할 |
 |---|---|
-| `.github/workflows/claude-code-request-v3.yml` | SDK 기반 워크플로우, CLIENT_PAYLOAD 전달 |
+| `.github/workflows/claude-code.yml` | SDK 기반 워크플로우, CLIENT_PAYLOAD 전달 |
 
 ---
 
@@ -687,7 +698,7 @@ const originalPayload = JSON.parse(
 
 ⚠️ **Slack API 의존**: `conversations.replies` 호출 실패 시 상태 유실  
 ⚠️ **메시지 삭제 취약**: 봇 메시지 삭제 시 상태 손상 (실무에서는 희귀)  
-⚠️ **Base64 크기 제한**: payload가 매우 클 경우 Slack metadata 제한 초과 가능 (현재는 문제없음)  
+⚠️ **Slack metadata 크기 제한**: payload가 매우 클 경우 Slack metadata 제한 초과 가능 (현재는 문제없음)
 ⚠️ **디버깅 복잡도**: 상태가 여러 메시지에 분산되어 있어 추적 어려움  
 
 ---
@@ -701,7 +712,7 @@ A1. `MAX_CLARIFICATION_INSTRUCTION`이 적용되어 더 이상 질문하지 못�
 A2. `pending_question` 상태에서는 모든 멘션이 "답변"으로 처리됩니다. 새로운 요청은 `/request`로 별도 스레드를 만들어야 합니다.
 
 **Q3. Follow-up 중 질문이 발생하면 branch/pr_number 정보가 유지되나요?**  
-A3. 네, `original_payload`에 `is_followup`, `branch`, `pr_number`가 모두 포함되어 base64로 저장되므로, 답변 후 복원됩니다 (slack.ts:20-22, events.js:151-153).
+A3. 네, Slack metadata payload에 `is_followup`, `branch`, `pr_number`가 모두 포함되므로, 답변 후 복원됩니다 (slack.ts:20-22, events.js:151-153).
 
 **Q4. PR 생성 후 메시지가 수정/삭제되면?**  
 A4. `findMetadataInThread()`가 역순 스캔하므로, 가장 최근의 `event_type: "pr_ready"` metadata를 찾습니다. 봇 메시지를 삭제하지 않는 한 안전합니다.

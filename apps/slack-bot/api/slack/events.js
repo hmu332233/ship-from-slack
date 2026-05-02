@@ -51,7 +51,7 @@ export default async function handler(req, res) {
     parsedEvent = event;
     const { channel, thread_ts, ts, text, user } = event;
 
-    console.log('[v2] Received event:', {
+    console.log('[slack-bot] Received event:', {
       type: eventType,
       channel,
       thread_ts,
@@ -81,7 +81,7 @@ export default async function handler(req, res) {
     // 쓰레드 메타데이터 조회 (역순 스캔)
     const metadata = await findMetadataInThread(channel, thread_ts);
 
-    console.log('[v2] Thread metadata:', metadata.type);
+    console.log('[slack-bot] Thread metadata:', metadata.type);
 
     switch (metadata.type) {
       // ===== 질문에 대한 답변 처리 =====
@@ -158,7 +158,7 @@ export default async function handler(req, res) {
           pr_number: originalPayload.pr_number || undefined,
         };
 
-        console.log('[v2] Triggering with clarified prompt:', JSON.stringify(payload, null, 2));
+        console.log('[slack-bot] Triggering with clarified prompt:', JSON.stringify(payload, null, 2));
         await triggerGitHubAction(payload);
         break;
       }
@@ -198,7 +198,7 @@ export default async function handler(req, res) {
           is_followup: true,
         };
 
-        console.log('[v2] Triggering follow-up:', JSON.stringify(payload, null, 2));
+        console.log('[slack-bot] Triggering follow-up:', JSON.stringify(payload, null, 2));
         await triggerGitHubAction(payload);
         break;
       }
@@ -218,7 +218,7 @@ export default async function handler(req, res) {
       }
 
       default:
-        console.log('[v2] Unexpected metadata type:', metadata.type);
+        console.log('[slack-bot] Unexpected metadata type:', metadata.type);
         break;
     }
 

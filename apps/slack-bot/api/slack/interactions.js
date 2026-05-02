@@ -31,7 +31,7 @@ export default async function handler(req, res) {
     const requestContent = view.state.values.request_input.request_content.value;
     const { channel_id, user_name } = privateMetadata;
 
-    console.log('[v2] Processing request:', {
+    console.log('[slack-bot] Processing request:', {
       user: user_name,
       channel: channel_id,
       content: requestContent.substring(0, 100),
@@ -40,7 +40,7 @@ export default async function handler(req, res) {
     // "요청 접수" 메시지 전송 (thread_ts 획득)
     const threadTs = await postRequestMessage(channel_id, user_name, requestContent);
 
-    // GitHub Actions 트리거 (v2 워크플로우)
+    // GitHub Actions 트리거
     const githubPayload = {
       prompt: requestContent,
       requester: user_name,
@@ -48,7 +48,7 @@ export default async function handler(req, res) {
       slack_thread_ts: threadTs,
     };
 
-    console.log('[v2] Triggering GitHub Action:', JSON.stringify(githubPayload, null, 2));
+    console.log('[slack-bot] Triggering GitHub Action:', JSON.stringify(githubPayload, null, 2));
 
     await triggerGitHubAction(githubPayload);
 
