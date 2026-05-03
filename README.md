@@ -2,9 +2,9 @@
 
 [한국어](README.KO.md)
 
-Slack threads for small code changes: clarify the request, run an AI coding agent, open a pull request, and send the preview back to Slack.
+Ship From Slack turns a Slack thread into a workflow for small, reviewable code changes: describe the change, let an AI coding agent open a pull request, deploy a preview, and check the result from the same thread.
 
-Small code changes usually get stuck in communication, not implementation.
+The point is not only to make the edit faster. It is to shorten the loop between asking for a small change and seeing the actual result, without scattering context across chat, GitHub, CI, and preview links.
 
 Ship From Slack is for teams that handle frequent, small product or content changes. Someone starts with `/request` in Slack, the Slack app collects and routes the request, and the coding agent decides whether it has enough context before turning the request into a pull request in the target repository.
 
@@ -24,6 +24,12 @@ Ship From Slack is for teams that handle frequent, small product or content chan
 Ship From Slack works best for small, reviewable changes such as copy updates, FAQ edits, simple UI tweaks, landing-page adjustments, and follow-up polish on an existing PR.
 
 It is not a production auto-deploy system, a replacement for code review, or a good fit for large architectural changes that need upfront design work.
+
+## Example Use Case
+
+One practical use case is a team that receives frequent small product or content update requests in Slack. Instead of turning each request into a separate engineering handoff, Ship From Slack keeps the request, generated pull request, preview deployment, and follow-up confirmation in one thread.
+
+In that setup, the value is not that every edit is fully automated. The value is that the team can check small changes quickly while engineers spend less time switching context between Slack, GitHub, CI, and preview environments.
 
 ## Example Flow
 
