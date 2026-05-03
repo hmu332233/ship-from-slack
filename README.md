@@ -4,7 +4,9 @@
 
 Slack threads for small code changes: clarify the request, run an AI coding agent, open a pull request, and send the preview back to Slack.
 
-Ship From Slack is for teams that handle frequent, small product or content changes. A requester starts with `/request` in Slack, the bot asks follow-up questions when the request is unclear, and the agent turns the final request into a pull request in the target repository.
+Small code changes usually get stuck in communication, not implementation.
+
+Ship From Slack is for teams that handle frequent, small product or content changes. Someone starts with `/request` in Slack, the Slack app collects and routes the request, and the coding agent decides whether it has enough context before turning the request into a pull request in the target repository.
 
 <img src="./docs/example.png" width="420" alt="Slack thread showing a request, clarification, pull request, and preview link" />
 
@@ -23,11 +25,29 @@ Ship From Slack works best for small, reviewable changes such as copy updates, F
 
 It is not a production auto-deploy system, a replacement for code review, or a good fit for large architectural changes that need upfront design work.
 
+## Example Flow
+
+```text
+/request Add "How do refunds work?" to the FAQ
+  -> the Slack app sends the request to GitHub Actions
+  -> the coding agent asks a follow-up question if it needs more context
+  -> the coding agent opens a pull request when the request is clear enough
+  -> the preview link is posted back to the same Slack thread
+  -> the same person asks for a small follow-up change in the same thread
+```
+
+## Who It Helps
+
+- People asking for changes can stay in Slack, review the preview, and refine the change without leaving the original thread.
+- Repo owners can receive repeated small requests as pull requests that are scoped, reviewable, and tied back to the discussion.
+
 ## How It Works
+
+For the person asking for a change, the Slack thread is the only surface they need to follow.
 
 ```text
 Slack /request
-  -> Slack Bot on Vercel
+  -> Slack app on Vercel
   -> GitHub repository_dispatch
   -> Target repository GitHub Actions workflow
   -> Claude Agent composite action
@@ -36,7 +56,7 @@ Slack /request
   -> Slack thread update
 ```
 
-The Slack thread is the workflow state. Bot messages store whether the request is waiting for clarification, currently in progress, or ready for follow-up changes on an existing PR.
+The Slack thread is the workflow state. Thread metadata records whether the request is waiting for clarification, currently in progress, or ready for follow-up changes on an existing PR.
 
 ## Repository Layout
 
@@ -47,6 +67,7 @@ apps/
   preview-deploy/   GitHub composite action for Vercel preview deploys
 docs/
   SETUP.md          End-to-end installation guide
+  SETUP.KO.md       Korean version of the setup guide
   ARCHITECTURE.md   Contributor-oriented workflow and state model
 ```
 
@@ -60,11 +81,11 @@ At a high level, setup has five parts:
 
 1. Create a Slack App with slash commands, interactivity, event subscriptions, and a bot token.
 2. Deploy `apps/slack-bot` to Vercel.
-3. Point the bot at the target repository with `GITHUB_REPO=owner/repo`.
+3. Point the Slack app at the target repository with `GITHUB_REPO=owner/repo`.
 4. Add `claude-code.yml` and optional `preview.yml` workflows to the target repository.
 5. Add the required Slack, GitHub, Anthropic, and optional Vercel secrets.
 
-Required Slack Bot environment variables:
+Required Slack app environment variables:
 
 | Variable | Purpose |
 | --- | --- |
@@ -91,7 +112,7 @@ Install dependencies from the workspace root:
 pnpm install
 ```
 
-Run the Slack bot locally with Vercel:
+Run the Slack app locally with Vercel:
 
 ```sh
 cd apps/slack-bot

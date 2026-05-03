@@ -4,7 +4,9 @@
 
 작은 코드 변경 요청을 Slack 쓰레드 안에서 정리하고, AI 코딩 에이전트가 Pull Request를 만들고, Preview 링크까지 다시 Slack으로 알려주는 워크플로우입니다.
 
-Ship From Slack은 작고 자주 발생하는 제품/콘텐츠 변경을 처리하는 팀을 위한 도구입니다. 요청자는 Slack에서 `/request`로 변경을 요청하고, 봇은 요청이 모호하면 추가 질문을 하며, 에이전트는 정리된 요청을 타겟 레포의 Pull Request로 만듭니다.
+작은 변경의 병목은 구현이 아니라 커뮤니케이션인 경우가 많습니다.
+
+Ship From Slack은 작고 자주 발생하는 제품/콘텐츠 변경을 처리하는 팀을 위한 도구입니다. 누군가 Slack에서 `/request`로 변경을 요청하면, Slack 앱은 요청을 접수해 GitHub Actions로 전달하고, 코딩 에이전트는 작업에 필요한 맥락이 충분한지 판단한 뒤 타겟 레포의 Pull Request로 만듭니다.
 
 <img src="./docs/example.png" width="420" alt="요청, 확인 질문, Pull Request, Preview 링크가 이어지는 Slack 쓰레드 예시" />
 
@@ -23,11 +25,29 @@ Ship From Slack은 카피 수정, FAQ 추가, 간단한 UI 조정, 랜딩 페이
 
 프로덕션 자동 배포 시스템이 아니며, 코드 리뷰를 대체하지 않습니다. 사전 설계가 필요한 큰 아키텍처 변경에도 적합하지 않습니다.
 
+## 예시 흐름
+
+```text
+/request FAQ에 "환불 절차는 어떻게 되나요?" 질문을 추가해줘
+  -> Slack 앱이 요청을 GitHub Actions로 전달합니다
+  -> 코딩 에이전트가 맥락이 더 필요하면 추가 질문을 합니다
+  -> 요청이 충분히 명확해지면 코딩 에이전트가 Pull Request를 엽니다
+  -> Preview 링크가 같은 Slack 쓰레드에 올라옵니다
+  -> 같은 사람이 같은 쓰레드에서 작은 후속 수정을 요청합니다
+```
+
+## 누구에게 도움이 되나요
+
+- 변경을 요청하는 사람은 Slack에서 요청하고, Preview를 확인하고, 원래 쓰레드 안에서 변경을 다듬을 수 있습니다.
+- 레포를 관리하는 사람은 반복적인 작은 요청을 범위가 작고 리뷰 가능한 Pull Request로 받을 수 있으며, 논의 맥락도 함께 추적할 수 있습니다.
+
 ## 동작 방식
+
+변경을 요청하는 사람 입장에서는 Slack 쓰레드 하나만 따라가면 됩니다.
 
 ```text
 Slack /request
-  -> Vercel에 배포된 Slack Bot
+  -> Vercel에 배포된 Slack 앱
   -> GitHub repository_dispatch
   -> 타겟 레포의 GitHub Actions workflow
   -> Claude Agent composite action
@@ -36,7 +56,7 @@ Slack /request
   -> Slack 쓰레드 업데이트
 ```
 
-Slack 쓰레드가 워크플로우의 상태 저장소 역할을 합니다. 봇 메시지는 요청이 확인 질문을 기다리는 중인지, 작업 중인지, 기존 PR에 추가 요청을 받을 수 있는 상태인지 저장합니다.
+Slack 쓰레드가 워크플로우의 상태 저장소 역할을 합니다. 쓰레드 메타데이터는 요청이 확인 질문을 기다리는 중인지, 작업 중인지, 기존 PR에 추가 요청을 받을 수 있는 상태인지 기록합니다.
 
 ## 레포 구조
 
@@ -61,11 +81,11 @@ docs/
 
 1. Slash Command, Interactivity, Event Subscriptions, Bot Token을 포함한 Slack App을 만듭니다.
 2. `apps/slack-bot`을 Vercel에 배포합니다.
-3. `GITHUB_REPO=owner/repo`로 봇이 타겟 레포를 바라보게 합니다.
+3. `GITHUB_REPO=owner/repo`로 Slack 앱이 타겟 레포를 바라보게 합니다.
 4. 타겟 레포에 `claude-code.yml`과 선택적 `preview.yml` workflow를 추가합니다.
 5. 필요한 Slack, GitHub, Anthropic, 선택적 Vercel secret을 추가합니다.
 
-Slack Bot에 필요한 환경 변수:
+Slack 앱에 필요한 환경 변수:
 
 | 변수 | 용도 |
 | --- | --- |
