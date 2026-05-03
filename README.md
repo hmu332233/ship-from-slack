@@ -195,12 +195,13 @@ Ship From Slack은
 | `VERCEL_ORG_ID`     | Vercel Organization ID                                        |
 | `VERCEL_PROJECT_ID` | Vercel Project ID                                             |
 
-### Setup Guides
+### Setup Guide
 
-| 가이드                                             | 내용                                         |
-| ----------------------------------------------- | ------------------------------------------ |
-| [Slack Bot 설정 가이드](apps/slack-bot/README.md) | Slack App 생성, Vercel 배포, URL 연결            |
-| [타겟 레포 설정 가이드](docs/USAGE-GUIDE.md)             | Workflow YAML 예시, Secrets 설정 |
+처음 설정한다면 아래 문서만 순서대로 따라가면 됩니다.
+
+👉 [통합 설정 가이드](docs/SETUP-GUIDE.md)
+
+Slack App 생성, Vercel 배포, Slack URL 연결, 타겟 레포 Workflow, GitHub Secrets, Preview 배포, 동작 확인까지 한 흐름으로 정리되어 있습니다.
 
 ---
 
@@ -208,4 +209,6 @@ Ship From Slack은
 
 | 문서                                         | 설명                          |
 | ------------------------------------------ | --------------------------- |
+| [Slack Bot 설정 가이드](apps/slack-bot/README.md) | Slack App 생성, Vercel 배포, URL 연결 세부 참고 |
+| [타겟 레포 설정 가이드](docs/USAGE-GUIDE.md)             | Workflow YAML 예시, Secrets 설정 세부 참고 |
 | [요청 흐름 상태 관리](docs/request-flow-states.md) | 내부 상태 머신, Payload 구조 (개발자용) |
